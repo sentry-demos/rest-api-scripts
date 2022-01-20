@@ -36,7 +36,6 @@ class Sentry():
         headers = {'Authorization': f'Bearer {self.token}'}
         url = f'{self.base_url}{endpoint}'
         response = requests.get(url, headers=headers)
-        #results.append(response.json())
         return response.json()
 
     def _put_api(self, endpoint, data=None):
@@ -65,12 +64,12 @@ if __name__ == '__main__':
     onpremise_token = os.environ['SENTRY_ONPREMISE_AUTH_TOKEN']
     cloud_token = os.environ['SENTRY_CLOUD_AUTH_TOKEN']
 
-    #On Premise URL could look like http://localhost:9000
-    sentry_onpremise = Sentry('ONPREMISEURL',
+    # copy over onpremise url (e.g. http://sentry.yourcompany.com)
+    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
                               'sentry',
                               onpremise_token)
     sentry_cloud = Sentry('https://sentry.io',
-                          'ORGSLUG',
+                          '<ORG_SLUG>',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
