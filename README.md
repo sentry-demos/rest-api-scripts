@@ -7,5 +7,5 @@ For sentry_subject_prefix_script.py, please make sure to set the following envir
 
 Additionally, please make sure to change the following in the script to match your on-premise version of Sentry and your SaaS Sentry org slug: 
 
-- `ONPREMISEURL`
-- `ORGSLUG`
+- `<ON_PREMISE_URL>`
+- `<ORG_SLUG>`
