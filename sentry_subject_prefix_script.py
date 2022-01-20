@@ -2,7 +2,6 @@
 
 import os
 import sys
-
 import requests
 
 
@@ -35,18 +34,15 @@ class Sentry():
         """HTTP GET the Sentry API"""
 
         headers = {'Authorization': f'Bearer {self.token}'}
-        results = []
         url = f'{self.base_url}{endpoint}'
         response = requests.get(url, headers=headers)
-        results.append(response.json())
-        return results
+        #results.append(response.json())
+        return response.json()
 
     def _put_api(self, endpoint, data=None):
         """HTTP PUT the Sentry API"""
 
         headers = {'Authorization': f'Bearer {self.token}'}
-
-        results = []
         url = f'{self.base_url}{endpoint}'
         return requests.put(url, headers=headers, data=data)
 
@@ -79,12 +75,13 @@ if __name__ == '__main__':
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
     for project in onpremise_projects:
+        onpremise_project_details = sentry_onpremise.get_project_details(project)
+
         #get onpremise subjectPrefix
-        selectedproject = sentry_onpremise.get_project_details(project)
-         #update new project with subjectPrefix if it was set in on-premise-project
-        for value in selectedproject:
-            onpremise_subjectPrefix = value.get('subjectPrefix', '')
-            if (onpremise_subjectPrefix != ""):
-                #update new project
-                result = sentry_cloud.update_project_details(project, onpremise_subjectPrefix)
+        subject_prefix = onpremise_project_details.get('subjectPrefix', '')
+
+        #update new project with subjectPrefix if it was set in on-premise-project
+        if subject_prefix:
+            result = sentry_cloud.update_project_details(project, subject_prefix)
+
 
