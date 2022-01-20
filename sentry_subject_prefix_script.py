@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
     sentry_onpremise = Sentry('<ON_PREMISE_URL>',
-                              'sentry',
+                              '<ORG_SLUG>',
                               onpremise_token)
     sentry_cloud = Sentry('https://sentry.io',
                           '<ORG_SLUG>',
