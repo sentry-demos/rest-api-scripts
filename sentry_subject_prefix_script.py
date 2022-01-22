@@ -80,7 +80,7 @@ if __name__ == '__main__':
         subject_prefix = onpremise_project_details.get('subjectPrefix', '')
 
         #update new project with subjectPrefix if it was set in on-premise-project
-        if subject_prefix:
+        if subject_prefix and subject_prefix!='':
             result = sentry_cloud.update_project_details(project, subject_prefix)
 
 
