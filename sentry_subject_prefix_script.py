@@ -65,11 +65,11 @@ if __name__ == '__main__':
     cloud_token = os.environ['SENTRY_CLOUD_AUTH_TOKEN']
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
-                              '<ON_PREMISE_ORG_SLUG>',
+    sentry_onpremise = Sentry('http://localhost:9000',
+                              'sentry',
                               onpremise_token)
     sentry_cloud = Sentry('https://sentry.io',
-                          '<ORG_SLUG>',
+                           'testorg-az',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
@@ -80,7 +80,7 @@ if __name__ == '__main__':
         subject_prefix = onpremise_project_details.get('subjectPrefix', '')
 
         #update new project with subjectPrefix if it was set in on-premise-project
-        if subject_prefix:
+        if subject_prefix and subject_prefix!='':
             result = sentry_cloud.update_project_details(project, subject_prefix)
 
 
