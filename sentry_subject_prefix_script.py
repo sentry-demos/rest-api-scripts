@@ -65,11 +65,11 @@ if __name__ == '__main__':
     cloud_token = os.environ['SENTRY_CLOUD_AUTH_TOKEN']
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('http://localhost:9000',
-                              'sentry',
+    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
+                              '<ON_PREMISE_ORG_SLUG>',
                               onpremise_token)
-    sentry_cloud = Sentry('https://sentry.io',
-                           'testorg-az',
+    sentry_cloud = Sentry('<ORG_SLUG>',
+                            '<CLOUD_ORG_SLUG>',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
