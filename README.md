@@ -10,3 +10,5 @@ Additionally, please make sure to change the following in the script to match yo
 - `<ON_PREMISE_URL>`
 - `<ON_PREMISE_ORG_SLUG>`
 - `<ORG_SLUG>`
+
+For the following script, `sentry_member_team_map.py`, you will need to have Python3 to run.  It was tested scucessfully with Python3.7.  
