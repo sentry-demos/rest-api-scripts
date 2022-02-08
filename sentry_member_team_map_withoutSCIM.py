@@ -70,9 +70,9 @@ if __name__ == '__main__':
                               '<ON_PREMISE_ORG_SLUG>',
                               onpremise_token)
 
-    sentry_cloud = Sentry('<ORG_SLUG>',
-                            '<CLOUD_ORG_SLUG>',
-                            cloud_token)
+    sentry_cloud = Sentry('https://sentry.io',
+                              '<ORG_SLUG>',
+                              cloud_token)
 
     onpremise_teams = sentry_onpremise.get_teams_reg()
 
@@ -106,7 +106,7 @@ if __name__ == '__main__':
             }
             data["userName"] = member.get('email');
             data['email'] = member.get('email');
-            newuser = sentry_cloud.create_team_member(data)
+            newuser = sentry_cloud.create_team_member_reg(data)
             
             #get id of new user
             newuser_id = newuser.get("id")
