@@ -28,7 +28,7 @@ class Sentry():
         url = f'{self.base_url}{endpoint}'
         return requests.post(url, headers=headers, data=data)
 
-    def get_teams_reg(self):
+    def get_teams(self):
         """Return a dictionary mapping team slugs to a set of project slugs"""
 
         results = self._get_api(f'/api/0/organizations/{self.org}/teams/')
@@ -40,13 +40,13 @@ class Sentry():
         results = self._get_api(f'/api/0/teams/{self.org}/{teamname}/members/')
         return results
 
-    def get_org_members_reg(self):
+    def get_org_members(self):
         """Get members from an organization"""
 
         members = self._get_api(f'/api/0/organizations/{self.org}/members/')
         return members
 
-    def create_team_member_reg(self, data=None):
+    def create_team_member(self, data=None):
         """Create team member"""
 
         teammember = self._post_api(f'/api/0/organizations/{self.org}/members/', data)
@@ -71,16 +71,16 @@ if __name__ == '__main__':
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                              '<ORG_SLUG>',
+                              'testorg-az',
                               cloud_token)
 
-    onpremise_teams = sentry_onpremise.get_teams_reg()
+    onpremise_teams = sentry_onpremise.get_teams()
 
     updated_ids_dict = {}
 
     #To be used for ID swap for easier lookup later
-    onprem_members = sentry_onpremise.get_org_members_reg()
-    cloud_members = sentry_cloud.get_org_members_reg()
+    onprem_members = sentry_onpremise.get_org_members()
+    cloud_members = sentry_cloud.get_org_members()
     
 
     #get id of old account and store it along with email in a common dictionary, i.e. updated_ids_dict
@@ -106,7 +106,7 @@ if __name__ == '__main__':
             }
             data["userName"] = member.get('email');
             data['email'] = member.get('email');
-            newuser = sentry_cloud.create_team_member_reg(data)
+            newuser = sentry_cloud.create_team_member(data)
             
             #get id of new user
             newuser_id = newuser.get("id")
