@@ -13,6 +13,25 @@ class Sentry():
         self.org = org
         self.token = token
 
+    def _get_api_pagination(self, endpoint):
+        """HTTP GET the Sentry API, following pagination links"""
+
+        headers = {'Authorization': f'Bearer {self.token}'}
+
+        results = []
+        url = f'{self.base_url}{endpoint}'
+        next = True
+        while next:
+            response = requests.get(url, headers=headers)
+            results.extend(response.json())
+
+            url = response.links.get('next', {}).get('url')
+            next = response.links.get('next', {}).get('results') == 'true'
+            if url == None:
+                next = False
+
+        return results
+
     def _get_api(self, endpoint):
         """HTTP GET the Sentry API"""
 
@@ -31,19 +50,19 @@ class Sentry():
     def get_teams(self):
         """Return a dictionary mapping team slugs to a set of project slugs"""
 
-        results = self._get_api(f'/api/0/organizations/{self.org}/teams/')
+        results = self._get_api_pagination(f'/api/0/organizations/{self.org}/teams/')
         return {team['slug']: team for team in results if 'slug' in team}
 
     def get_teams_members_reg(self, teamname):
         """Return a dictionary mapping team slugs to a set of project slugs"""
 
-        results = self._get_api(f'/api/0/teams/{self.org}/{teamname}/members/')
+        results = self._get_api_pagination(f'/api/0/teams/{self.org}/{teamname}/members/')
         return results
 
     def get_org_members(self):
         """Get members from an organization"""
 
-        members = self._get_api(f'/api/0/organizations/{self.org}/members/')
+        members = self._get_api_pagination(f'/api/0/organizations/{self.org}/members/')
         return members
 
     def create_team_member(self, data=None):
@@ -71,7 +90,7 @@ if __name__ == '__main__':
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                              'testorg-az',
+                              '<ORG_SLUG>',
                               cloud_token)
 
     onpremise_teams = sentry_onpremise.get_teams()
@@ -81,7 +100,11 @@ if __name__ == '__main__':
     #To be used for ID swap for easier lookup later
     onprem_members = sentry_onpremise.get_org_members()
     cloud_members = sentry_cloud.get_org_members()
-    
+
+
+    #print(onprem_members)
+    #cloud_members = sentry_cloud.get_org_members()
+
 
     #get id of old account and store it along with email in a common dictionary, i.e. updated_ids_dict
 
