@@ -93,11 +93,6 @@ if __name__ == '__main__':
     onprem_members = sentry_onpremise.get_org_members()
     cloud_members = sentry_cloud.get_org_members()
 
-
-    #print(onprem_members)
-    #cloud_members = sentry_cloud.get_org_members()
-
-
     #get id of old account and store it along with email in a common dictionary, i.e. updated_ids_dict
 
     for member in onprem_members:
