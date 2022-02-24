@@ -4,7 +4,7 @@ import os
 import sys
 import requests
 import json
-
+import logging
 
 class Sentry():
     def __init__(self, base_url, org, token):
@@ -72,77 +72,96 @@ class Sentry():
 
 
 if __name__ == '__main__':
-
+    
+    logging.basicConfig(filename=os.path.basename(__file__)+'.log', 
+        format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s', 
+        datefmt='%Y-%m-%d:%H:%M:%S', level=logging.DEBUG, filemode='a')
+    logger = logging.getLogger(__name__)
+    logger.info(">>> Script started")
     onpremise_token = os.environ['SENTRY_ONPREMISE_AUTH_TOKEN']
+    onpremise_url = os.environ['ON_PREMISE_URL']
+    onpremise_slug = os.environ['ON_PREMISE_ORG_SLUG']
     cloud_token = os.environ['SENTRY_CLOUD_AUTH_TOKEN']
+    cloud_slug = os.environ['ORG_SLUG']
+
+    onpremise_url = onpremise_url.strip("/"); #removes trailing slash '/' of the URL if needed
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
-                              '<ON_PREMISE_ORG_SLUG>',
+    sentry_onpremise = Sentry(onpremise_url,
+                              onpremise_slug,
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                              '<ORG_SLUG>',
+                              cloud_slug,
                               cloud_token)
 
     onpremise_teams = sentry_onpremise.get_teams()
-
+    cloud_teams = sentry_cloud.get_teams()
+    logger.info("Get on-prem teams completed.")
     updated_ids_dict = {}
 
     #To be used for ID swap for easier lookup later
-    onprem_members = sentry_onpremise.get_org_members()
+    onpremise_members = sentry_onpremise.get_org_members()
+    logger.info("Get on-prem members completed.")
     cloud_members = sentry_cloud.get_org_members()
+    logger.info("Get cloud members completed.")
 
     #get id of old account and store it along with email in a common dictionary, i.e. updated_ids_dict
-
-    for member in onprem_members:
+    logger.info("Checking for duplicate users...")
+    for member in onpremise_members:
         found = 0
+        # Check if any onpremise members already exist as cloud members
         for cloudmember in cloud_members:
-              if (member.get('email') ==
-                (cloudmember.get('email'))):
-                    member['id'] = cloudmember.get('id')
-                    #update id in common dictionary
-                    updated_ids_dict[member.get('email')] = cloudmember.get('id')
-                    found = 1
-                    break
+            if (member.get('email') == (cloudmember.get('email'))):
+                member['id'] = cloudmember.get('id')
+                #update id in common dictionary to use pre-existing cloud member's id
+                updated_ids_dict[member.get('email')] = cloudmember.get('id')
+                found = 1
+                logger.info("Duplicate member found! They already exist in cloud: %s" % (member.get('email')))
+                break
 
-        #Make a new user if not found in new org, email must match what is on Okta
+        # Make a new user if not found in cloud, email must match what is on Okta
         if (found == 0):
-
+            role = member.get('role')
             #Create new user
             data = {
                 "email": "",
-                "role": "member"
+                "role": role
             }
-            data["userName"] = member.get('email');
-            data['email'] = member.get('email');
+            data["userName"] = member.get('email')
+            data['email'] = member.get('email')
             newuser = sentry_cloud.create_team_member(data)
-            
+            logger.info("Created new user (userName, role) in cloud: %s, %s" % (data["userName"], data['role']))
             #get id of new user
             newuser_id = newuser.get("id")
             
             #update id in common dictionary
             updated_ids_dict[member['email']] = newuser_id
 
-    # By now, all onprem_members should have updated ids for the new org,
+    # By now, all onpremise_members should have updated ids for the new org,
     # this should be stored in the new dictionary
     # this will enable easy dictionary lookup for ids
 
     # Teams exist in both spots, team names must exist in both spots but
     # ids will be different, as a result, team name must be used because
     # that's whats in common
+    userInput = input("\nWould you like to assign cloud users to teams?\nNote: Users would be assigned to the same team names as they had from onprem. The teams must already exist on the cloud Sentry.\n(y/n): ")
+    
+    if userInput.lower() == "y":
+        for team in onpremise_teams:
+            #update old team members with ids of new org member ids
+            for member in sentry_onpremise.get_teams_members_reg(team):
+                #onpremise team member for selected team has updated id
+                member['id'] = updated_ids_dict.get(member.get("email"))
+                
+                #update cloud team with member from on_prem team
+                if team in cloud_teams:
+                    sentry_cloud.update_team_reg(member['id'], team)
+                    logger.info("Cloud user %s has been assigned to team %s" % (member.get("email"), team))
+                else:
+                    logger.info("Team %s does not exist in cloud! Could not add user %s" % (team, member.get("email")))
+    else:
+        logger.info("Skipped assigning cloud users to corresponding onprem teams")
 
-    for team in onpremise_teams:
-        #update old team members with ids of new org member ids
-        for member in sentry_onpremise.get_teams_members_reg(team):
-            #update member id here
-            member['id'] = updated_ids_dict.get(member.get("email"))
-
-            #onpremise team member for selected team has updated id
-
-
-            #update cloud team with member from on_prem team
-            sentry_cloud.update_team_reg(member['id'], team)
-
-
-
+    logger.info("<<< Script completed")
+    print("\nScript completed. Log available in ./%s" % (os.path.basename(__file__)+'.log'))
