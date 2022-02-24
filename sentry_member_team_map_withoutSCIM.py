@@ -147,7 +147,7 @@ if __name__ == '__main__':
     # that's whats in common
     userInput = input("\nWould you like to assign cloud users to teams?\nNote: Users would be assigned to the same team names as they had from onprem. The teams must already exist on the cloud Sentry.\n(y/n): ")
     
-    if userInput == "y":
+    if userInput.lower() == "y":
         for team in onpremise_teams:
             #update old team members with ids of new org member ids
             for member in sentry_onpremise.get_teams_members_reg(team):
