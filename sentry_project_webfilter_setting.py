@@ -97,12 +97,12 @@ if __name__ == '__main__':
     cloud_token = os.environ['SENTRY_CLOUD_AUTH_TOKEN']
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('https://sentry.io',
-                              'testgavin',
+    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
+                              '<ON_PREMISE_ORG_SLUG>',
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                          'testorg-az',
+                          '<ORG_SLUG>',
                           cloud_token)
 
     onpremise_teams = sentry_onpremise.get_teams()
@@ -115,6 +115,6 @@ if __name__ == '__main__':
         # for each project grab filters
         filters = sentry_onpremise.get_project_filters(project)
         webcrawlerfilter = {'active':filter['active'] for filter in filters if 'web-crawlers' in filter.values()}
-        
+
         #update filters
         sentry_cloud.set_project_filters(project, webcrawlerfilter['active'])
