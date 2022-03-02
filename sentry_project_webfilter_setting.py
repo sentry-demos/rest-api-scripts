@@ -105,9 +105,6 @@ if __name__ == '__main__':
                           '<ORG_SLUG>',
                           cloud_token)
 
-    onpremise_teams = sentry_onpremise.get_teams()
-    cloud_teams = sentry_cloud.get_teams()
-
     onpremise_projects = sentry_onpremise.get_project_slugs()
 
     for project in onpremise_projects:
