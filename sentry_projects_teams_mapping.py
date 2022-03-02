@@ -32,8 +32,6 @@ class Sentry():
         """HTTP POST the Sentry API"""
 
         headers = {'Authorization': f'Bearer {self.token}'}
-
-        results = []
         url = f'{self.base_url}{endpoint}'
 
         return requests.post(url, headers=headers, data=data)
