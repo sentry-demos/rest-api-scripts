@@ -12,48 +12,47 @@ class Sentry():
         self.org = org
         self.token = token
 
-    def _get_api_pagination(self, endpoint):
-        """HTTP GET the Sentry API, following pagination links"""
+    def _get_api(self, endpoint):
+        """HTTP GET the Sentry API"""
 
         headers = {'Authorization': f'Bearer {self.token}'}
- 
-        results = []
         url = f'{self.base_url}{endpoint}'
-        next = True
-        while next:
-            response = requests.get(url, headers=headers)
-            results.extend(response.json())
-            url = response.links.get('next', {}).get('url')
-            next = response.links.get('next', {}).get('results') == 'true'
-
-        return results
+        response = requests.get(url, headers=headers)
+        return response.json()
 
     def _post_api(self, endpoint, data=None):
         """HTTP POST the Sentry API"""
 
         headers = {'Authorization': f'Bearer {self.token}'}
+
         url = f'{self.base_url}{endpoint}'
 
         return requests.post(url, headers=headers, data=data)
 
+    def _put_api(self, endpoint, data=None):
+        """HTTP PUT the Sentry API"""
+
+        headers = {'Authorization': f'Bearer {self.token}'}
+        url = f'{self.base_url}{endpoint}'
+        return requests.put(url, headers=headers, data=data)
+
     def get_project_slugs(self):
         """Return a list of project slugs in this Sentry org"""
 
-        results = self._get_api_pagination(f'/api/0/organizations/{self.org}/projects/')
-
+        results = self._get_api(f'/api/0/organizations/{self.org}/projects/')
         return [project.get('slug', '') for project in results]
 
     def get_keys(self, project_slug):
         """return the public and secret DSN links for the given project slug"""
 
-        results = self._get_api_pagination(f'/api/0/projects/{self.org}/{project_slug}/keys/')
+        results = self._get_api(f'/api/0/projects/{self.org}/{project_slug}/keys/')
 
         return (results[0]['dsn']['public'], results[0]['dsn']['secret'])
 
     def get_teams(self):
         """Return a dictionary mapping team slugs to a set of project slugs"""
 
-        results = self._get_api_pagination(f'/api/0/organizations/{self.org}/teams/')
+        results = self._get_api(f'/api/0/organizations/{self.org}/teams/')
 
         return {team['slug']: team for team in results if 'slug' in team}
 
@@ -67,6 +66,16 @@ class Sentry():
 
         return self._post_api(f'/api/0/projects/{self.org}/{project}/teams/{team}/')
 
+    def get_project_settings(self, project):
+        """Get project settings"""
+
+        return self._get_api(f'/api/0/projects/{self.org}/{project}/')
+
+    def set_project_platform(self, project, filtervalue):
+        """Update project with platform value"""
+
+        result = self._put_api(f'/api/0/projects/{self.org}/{project}/', data={"platform": filtervalue})
+        print(result)
 
 def get_team_projects(teams):
     mapping = {}
@@ -84,27 +93,17 @@ if __name__ == '__main__':
     sentry_onpremise = Sentry('<ON_PREMISE_URL>',
                               '<ON_PREMISE_ORG_SLUG>',
                               onpremise_token)
+
     sentry_cloud = Sentry('https://sentry.io',
                           '<ORG_SLUG>',
                           cloud_token)
 
-    onpremise_teams = sentry_onpremise.get_teams()
-    cloud_teams = sentry_cloud.get_teams()
+    onpremise_projects = sentry_onpremise.get_project_slugs()
 
-    onpremise_projects = get_team_projects(onpremise_teams)
-    cloud_projects = get_team_projects(cloud_teams)
+    for project in onpremise_projects:
 
-    # If a team is in onpremise, but not cloud, it should be added to cloud
-    missing_teams = onpremise_teams.keys() - cloud_teams.keys()
-    for team in missing_teams:
-        print(f'Creating mising team {team}: ')
-        sentry_cloud.create_team(onpremise_teams[team]['name'], onpremise_teams[team]['slug'])
-        cloud_projects[team] = set()
+        # for each project grab platform type
+        filters = sentry_onpremise.get_project_settings(project)
 
-    # If a team exists in both, grant any missing project access in cloud
-    common_teams = onpremise_projects.keys() & cloud_projects.keys()
-    for team in common_teams:
-        missing_projects = onpremise_projects[team] - cloud_projects[team]
-        for project in missing_projects:
-            print(f'Granting team {team} missing access to project {project}: ')
-            sentry_cloud.give_team_access_to_project(team, project)
+        #update Sentry SaaS platform type
+        sentry_cloud.set_project_platform(project, filters.get('platform'))

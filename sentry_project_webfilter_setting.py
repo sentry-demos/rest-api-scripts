@@ -12,7 +12,7 @@ class Sentry():
         self.org = org
         self.token = token
 
-    def _get_api(self, endpoint):
+    def _get_api_pagination(self, endpoint):
         """HTTP GET the Sentry API, following pagination links"""
 
         headers = {'Authorization': f'Bearer {self.token}'}
@@ -47,20 +47,20 @@ class Sentry():
     def get_project_slugs(self):
         """Return a list of project slugs in this Sentry org"""
 
-        results = self._get_api(f'/api/0/organizations/{self.org}/projects/')
+        results = self._get_api_pagination(f'/api/0/organizations/{self.org}/projects/')
         return [project.get('slug', '') for project in results]
 
     def get_keys(self, project_slug):
         """return the public and secret DSN links for the given project slug"""
 
-        results = self._get_api(f'/api/0/projects/{self.org}/{project_slug}/keys/')
+        results = self._get_api_pagination(f'/api/0/projects/{self.org}/{project_slug}/keys/')
 
         return (results[0]['dsn']['public'], results[0]['dsn']['secret'])
 
     def get_teams(self):
         """Return a dictionary mapping team slugs to a set of project slugs"""
 
-        results = self._get_api(f'/api/0/organizations/{self.org}/teams/')
+        results = self._get_api_pagination(f'/api/0/organizations/{self.org}/teams/')
 
         return {team['slug']: team for team in results if 'slug' in team}
 
@@ -77,9 +77,9 @@ class Sentry():
     def get_project_filters(self, project):
         """Give filters from a project"""
 
-        return self._get_api(f'/api/0/projects/{self.org}/{project}/filters/')
+        return self._get_api_pagination(f'/api/0/projects/{self.org}/{project}/filters/')
 
-    def set_project_filters(self, project, filtervalue):
+    def set_project_webfilter(self, project, filtervalue):
         """Update project with filter settings"""
 
         return self._put_api(f'/api/0/projects/{self.org}/{project}/filters/web-crawlers/', data={"active": filtervalue})
@@ -114,4 +114,4 @@ if __name__ == '__main__':
         webcrawlerfilter = {'active':filter['active'] for filter in filters if 'web-crawlers' in filter.values()}
 
         #update filters
-        sentry_cloud.set_project_filters(project, webcrawlerfilter['active'])
+        sentry_cloud.set_project_webfilter(project, webcrawlerfilter['active'])
