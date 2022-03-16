@@ -68,14 +68,8 @@ class Sentry():
 
     def get_project_environments(self, project):
         """Get environments for a project"""
-
-        print(self._get_api(f'/api/0/projects/{self.org}/{project}/environments/'))
+        
         return self._get_api(f'/api/0/projects/{self.org}/{project}/environments/')
-
-    def set_project_environments(self, project):
-        """Set environments for a project"""
-
-        return self._post_api(f'/api/0/projects/{self.org}/{project}/environments/')
 
 
 def get_team_projects(teams):
