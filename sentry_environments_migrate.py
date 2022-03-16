@@ -20,22 +20,6 @@ class Sentry():
         response = requests.get(url, headers=headers)
         return response.json()
 
-    def _post_api(self, endpoint, data=None):
-        """HTTP POST the Sentry API"""
-
-        headers = {'Authorization': f'Bearer {self.token}'}
-
-        url = f'{self.base_url}{endpoint}'
-
-        return requests.post(url, headers=headers, data=data)
-
-    def _put_api(self, endpoint, data=None):
-        """HTTP PUT the Sentry API"""
-
-        headers = {'Authorization': f'Bearer {self.token}'}
-        url = f'{self.base_url}{endpoint}'
-        return requests.put(url, headers=headers, data=data)
-
     def get_project_slugs(self):
         """Return a list of project slugs in this Sentry org"""
 
@@ -49,35 +33,10 @@ class Sentry():
 
         return (results[0]['dsn']['public'], results[0]['dsn']['secret'])
 
-    def get_teams(self):
-        """Return a dictionary mapping team slugs to a set of project slugs"""
-
-        results = self._get_api(f'/api/0/organizations/{self.org}/teams/')
-
-        return {team['slug']: team for team in results if 'slug' in team}
-
-    def create_team(self, name, slug):
-        """Create a new team in this Sentry org with the given name and slug"""
-
-        return self._post_api(f'/api/0/organizations/{self.org}/teams/', data={'name': name, 'slug': slug})
-
-    def give_team_access_to_project(self, team, project):
-        """Give a team access to a project"""
-
-        return self._post_api(f'/api/0/projects/{self.org}/{project}/teams/{team}/')
-
     def get_project_environments(self, project):
         """Get environments for a project"""
-        
+
         return self._get_api(f'/api/0/projects/{self.org}/{project}/environments/')
-
-
-def get_team_projects(teams):
-    mapping = {}
-    for slug, team in teams.items():
-        mapping[slug] = {project['slug'] for project in team.get('projects', []) if 'slug' in project}
-
-    return mapping
 
 
 if __name__ == '__main__':
