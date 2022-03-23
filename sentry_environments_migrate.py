@@ -45,12 +45,12 @@ if __name__ == '__main__':
 
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
-                              '<ON_PREMISE_ORG_SLUG>',
+    sentry_onpremise = Sentry('https://sentry.io',
+                              'adamstestorgz',
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                          '<ORG_SLUG>',
+                          'testorg-az',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
@@ -69,20 +69,25 @@ if __name__ == '__main__':
         #grab the environments from the SaaS Sentry account
         cloud_environments = sentry_cloud.get_project_environments(project)
 
+        common_environments = []
+        if (cloud_environments != []):
+            for environment in environments:
+                #if environment already exists in cloud, skip
+                for cenvironment in cloud_environments:
+                    if (environment["name"] == cenvironment["name"]):
+                        break
+                    else:
+                        common_environments.append(environment)
+        else:
+            common_environments = environments
 
+        #update DSN with Sentry SaaS project DSN
+        keys = sentry_cloud.get_keys(project)
+        os.environ["SENTRY_DSN"]=keys[0]
 
         # iterate through environments from on-prem account
-        for environment in environments:
-             #if environment already exists in cloud, skip
-            for cenvironment in cloud_environments:
-                if (environment["name"]==cenvironment["name"]):
-                    continue
-                else:
-                    #update DSN with Sentry SaaS project DSN
-                    keys = sentry_cloud.get_keys(project)
-                    os.system('export SENTRY_DSN=' + keys[0] +'')
-                    #update Sentry SaaS projects with environment only if the environment
-                    #is missing from the Sentry SaaS project
-                    os.system('sentry-cli send-event --env ' + environment['name'] + ' -m "setting up environment %s" -a ' + environment['name'])
-                
-            
+        for environment in common_environments:
+            #update Sentry SaaS projects with environment only if the environment
+            #is missing from the Sentry SaaS project
+            os.system('sentry-cli send-event --env ' + environment['name'] + ' -m "setting up environment %s" -a ' + environment['name'])
+
