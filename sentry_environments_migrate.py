@@ -24,6 +24,7 @@ class Sentry():
         """Return a list of project slugs in this Sentry org"""
 
         results = self._get_api(f'/api/0/organizations/{self.org}/projects/')
+        print("RESULTS ", results)
         return [project.get('slug', '') for project in results]
 
     def get_keys(self, project_slug):
@@ -63,14 +64,28 @@ if __name__ == '__main__':
         #grab project DSN
         keys = sentry_onpremise.get_keys(project)
 
-        #set DSN key
-        os.system('export SENTRY_DSN=' + keys[0] +'')
+        #grab the environments from the SaaS Sentry account
+        cloud_environments = sentry_cloud.get_project_environments(project)
 
+        common_environments = []
+        if (cloud_environments != []):
+            for environment in environments:
+                #if environment already exists in cloud, skip
+                for cenvironment in cloud_environments:
+                    if (environment["name"] == cenvironment["name"]):
+                        break
+                    else:
+                        common_environments.append(environment)
+        else:
+            common_environments = environments
+
+        #update DSN with Sentry SaaS project DSN
+        keys = sentry_cloud.get_keys(project)
+        os.environ["SENTRY_DSN"]=keys[0]
 
         # iterate through environments from on-prem account
-        for environment in environments:
-            #update DSN with Sentry SaaS project DSN
-            keys = sentry_cloud.get_keys(project)
-            os.system('export SENTRY_DSN=' + keys[0] +'')
-            #update Sentry SaaS projects with environment
+        for environment in common_environments:
+            #update Sentry SaaS projects with environment only if the environment
+            #is missing from the Sentry SaaS project
             os.system('sentry-cli send-event --env ' + environment['name'] + ' -m "setting up environment %s" -a ' + environment['name'])
+
