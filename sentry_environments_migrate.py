@@ -66,11 +66,23 @@ if __name__ == '__main__':
         #set DSN key
         os.system('export SENTRY_DSN=' + keys[0] +'')
 
+        #grab the environments from the SaaS Sentry account
+        cloud_environments = sentry_cloud.get_project_environments(project)
+
+
 
         # iterate through environments from on-prem account
         for environment in environments:
-            #update DSN with Sentry SaaS project DSN
-            keys = sentry_cloud.get_keys(project)
-            os.system('export SENTRY_DSN=' + keys[0] +'')
-            #update Sentry SaaS projects with environment
-            os.system('sentry-cli send-event --env ' + environment['name'] + ' -m "setting up environment %s" -a ' + environment['name'])
+             #if environment already exists in cloud, skip
+            for cenvironment in cloud_environments:
+                if (environment["name"]==cenvironment["name"]):
+                    continue
+                else:
+                    #update DSN with Sentry SaaS project DSN
+                    keys = sentry_cloud.get_keys(project)
+                    os.system('export SENTRY_DSN=' + keys[0] +'')
+                    #update Sentry SaaS projects with environment only if the environment
+                    #is missing from the Sentry SaaS project
+                    os.system('sentry-cli send-event --env ' + environment['name'] + ' -m "setting up environment %s" -a ' + environment['name'])
+                
+            
