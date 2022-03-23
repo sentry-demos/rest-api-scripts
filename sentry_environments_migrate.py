@@ -24,6 +24,7 @@ class Sentry():
         """Return a list of project slugs in this Sentry org"""
 
         results = self._get_api(f'/api/0/organizations/{self.org}/projects/')
+        print("RESULTS ", results)
         return [project.get('slug', '') for project in results]
 
     def get_keys(self, project_slug):
@@ -45,12 +46,12 @@ if __name__ == '__main__':
 
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('https://sentry.io',
-                              'adamstestorgz',
+    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
+                              '<ON_PREMISE_ORG_SLUG>',
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                          'testorg-az',
+                          '<ORG_SLUG>',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
@@ -62,9 +63,6 @@ if __name__ == '__main__':
 
         #grab project DSN
         keys = sentry_onpremise.get_keys(project)
-
-        #set DSN key
-        os.system('export SENTRY_DSN=' + keys[0] +'')
 
         #grab the environments from the SaaS Sentry account
         cloud_environments = sentry_cloud.get_project_environments(project)

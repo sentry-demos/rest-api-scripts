@@ -73,11 +73,11 @@ if __name__ == '__main__':
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
     sentry_onpremise = Sentry('https://sentry.io',
-                              'adamstestorgz',
+                              '<ON_PREMISE_ORG_SLUG>',
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                          'testorg-az',
+                          '<ORG_SLUG>',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
