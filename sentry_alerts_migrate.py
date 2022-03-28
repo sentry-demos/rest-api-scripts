@@ -39,6 +39,14 @@ class Sentry():
                 next = False
 
         return results
+    
+    def _put_api(self, endpoint, data=None):
+        """HTTP PUT the Sentry API"""
+
+        headers = {'Authorization': f'Bearer {self.token}',
+                    'Content-Type': 'application/json'}
+        url = f'{self.base_url}{endpoint}'
+        return requests.put(url, headers=headers, data=data)
 
     def _post_api(self, endpoint, data=None):
         """HTTP POST the Sentry API"""
@@ -71,6 +79,16 @@ class Sentry():
         """Create a metric alert for a Sentry project"""
 
         return self._post_api(f'/api/0/projects/{self.org}/{project}/alert-rules/', data=data)
+        
+
+    def update_project_issue_alert(self, project, alertID, data=None):
+        """Update the issue alert for a Sentry project"""
+
+        return self._put_api(f'/api/0/projects/{self.org}/{project}/rules/{alertID}/', data=data)
+
+    def update_project_metric_alert(self, project, alertID, data=None):
+        """Update the metric alert for a Sentry project"""
+        return self._put_api(f'/api/0/projects/{self.org}/{project}/alert-rules/{alertID}/', data=data)
 
     def get_project_alerts(self, project):
         """Return a list of alerts for Sentry project"""
@@ -99,18 +117,19 @@ if __name__ == '__main__':
 
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('https://sentry.io',
-                              'adamstestorgz',
+    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
+                              '<ON_PREMISE_ORG_SLUG>',
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                          'testorg-az',
+                          '<ORG_SLUG>',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
     onpremise_teams = sentry_onpremise.get_teams()
 
-    #grab team id and team slug name from on-prem and add it to a dictionary
+    # Map team ids from on-prem to cloud so we can correctly create alerts for the 
+    # right team in cloud
     onprem_id_slugname = {team['slug']: team['id'] for team in onpremise_teams}
 
     #grab team id and team slug name from cloud and add it to another dictionary
@@ -139,46 +158,82 @@ if __name__ == '__main__':
         # project and send the alert in there
         for alert in alerts:
             #update the team id on the alert
+            
+            # the below is to strip the teamid value that will be replaced with the 
+            # teamid of the ids on SaaS Sentry
             teamid = alert["owner"][5:]
             teamid = dictionary_with_updatedvalues[teamid]
             alert["owner"] = "team:" + str(teamid)
 
+            #to be used for modifying the alert 
+            modify = 0
+            cloud_alert_to_modify = alert
+            alertID = alert["id"]
+
             #iterate through all SaaS Sentry alerts to see if the on-prem Sentry
-            #alert already exists, if it does, delete it
+            #alert already exists, if it does, modify it but don't create new alert
             for cloudalert in cloudalerts:
                 if (cloudalert['name'] == alert['name']):
-                    if "triggers" in cloudalert:
-                        sentry_cloud.delete_project_metric_alert(project, cloudalert["id"])
-                    else:
-                        sentry_cloud.delete_project_issue_alert(project, cloudalert["id"])
+                    if "triggers" not in cloudalert:
+                        modify = 1
+                        #make sure alerts JSON has environment tag set and Slack workspace set
+                        cloudalert["environment"] = alert["environment"]
+                        #merge Sentry local actions with Sentry Cloud actions
+                        if (alert["actions"]!=[]):
+                            for index in range(len(alert["actions"])):
+                                #check for Slack integration, only update Workspace id
+                                if alert["actions"][index]["id"] == "sentry.integrations.slack.notify_action.SlackNotifyServiceAction":
+                                    for cloudindex in range(len(cloudalert["actions"])):
+                                        if cloudalert["actions"][cloudindex]["id"] == "sentry.integrations.slack.notify_action.SlackNotifyServiceAction":
+                                            #replace workspace number
+                                            cloudalert["actions"][cloudindex]["workspace"] = alert["actions"][index]["workspace"]
+                        cloud_alert_to_modify = cloudalert
+                        alertID = cloud_alert_to_modify["id"]
+                    
 
+                        #Can delete the alert with the two options below
+                        #1.  sentry_cloud.delete_project_metric_alert(project, cloudalert["id"])
+                        #2.  sentry_cloud.delete_project_issue_alert(project, cloudalert["id"])
 
             #format the alert, if this is not done, you will get a 500 error back from
             #Sentry
-            temp_alert = alert
-            temp_alert.pop('id', None)
-            temp_alert.pop('dateCreated', None)
-            temp_alert.pop('createdBy', None)
-            temp_alert.pop('projects', None)
-            temp_alert.pop('type', None)
-            temp_alert.pop('dateModified', None)
-            if "triggers" in temp_alert:
-                for value in temp_alert["triggers"]:
-                    del value["dateCreated"]
-                    del value["id"]
-                    del value["alertRuleId"]
-                    for action in value["actions"]:
-                        del value["actions"][0]["id"]
-                        del value["actions"][0]["alertRuleTriggerId"]
-                        del value["actions"][0]["dateCreated"]
-            temp_alert = json.dumps(alert).replace('None', 'null')
+            if (modify != 1):
+                temp_alert = alert
+                temp_alert.pop('id', None)
+                temp_alert.pop('dateCreated', None)
+                temp_alert.pop('createdBy', None)
+                temp_alert.pop('projects', None)
+                temp_alert.pop('type', None)
+                temp_alert.pop('dateModified', None)
+                if "triggers" in temp_alert:
+                    for value in temp_alert["triggers"]:
+                        del value["dateCreated"]
+                        del value["id"]
+                        del value["alertRuleId"]
+                        for index in range(len(value["actions"])):
+                            del value["actions"][index]["id"]
+                            del value["actions"][index]["alertRuleTriggerId"]
+                            del value["actions"][index]["dateCreated"]
+                            #update team ids for the actions
+                            if value["actions"][index]["targetType"] == "team":
+                                value["actions"][index]["targetIdentifier"]=dictionary_with_updatedvalues[value["actions"][index]["targetIdentifier"]]
+                temp_alert = json.dumps(temp_alert).replace('None', 'null')
+            else:
+                temp_alert = cloud_alert_to_modify
+                temp_alert.pop('type', None)
+                temp_alert = json.dumps(temp_alert).replace('None', 'null')
 
             #check if the alert is a metric alert or issue alert and
-            # create the proper alert
+            # create/update the proper alert, updating metric alerts not supported yet
             if "triggers" in temp_alert:
-                sentry_cloud.create_project_metric_alert(project, temp_alert)
+                if modify != 1:
+                    sentry_cloud.create_project_metric_alert(project, temp_alert)
+
             else:
-                sentry_cloud.create_project_issue_alert(project, temp_alert)
+                if modify == 1:
+                    sentry_cloud.update_project_issue_alert(project, alertID, temp_alert)
+                else:
+                    sentry_cloud.create_project_issue_alert(project, temp_alert)
 
 
 

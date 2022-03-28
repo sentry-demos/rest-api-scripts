@@ -16,7 +16,7 @@ class Sentry():
         """HTTP GET the Sentry API, following pagination links"""
 
         headers = {'Authorization': f'Bearer {self.token}'}
- 
+
         results = []
         url = f'{self.base_url}{endpoint}'
         next = True
@@ -60,6 +60,11 @@ class Sentry():
 
         return self._post_api(f'/api/0/projects/{self.org}/{project}/teams/{team}/')
 
+    def get_projects(self):
+        results = self._get_api_pagination(f'/api/0/organizations/{self.org}/projects/')
+
+        return [project.get('slug', '') for project in results]
+
 
 def get_team_projects(teams):
     mapping = {}
@@ -68,11 +73,10 @@ def get_team_projects(teams):
 
     return mapping
 
-
 if __name__ == '__main__':
+
     onpremise_token = os.environ['SENTRY_ONPREMISE_AUTH_TOKEN']
     cloud_token = os.environ['SENTRY_CLOUD_AUTH_TOKEN']
-
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
     sentry_onpremise = Sentry('<ON_PREMISE_URL>',
                               '<ON_PREMISE_ORG_SLUG>',
@@ -85,19 +89,25 @@ if __name__ == '__main__':
     cloud_teams = sentry_cloud.get_teams()
 
     onpremise_projects = get_team_projects(onpremise_teams)
+
     cloud_projects = get_team_projects(cloud_teams)
 
-    # If a team is in onpremise, but not cloud, it should be added to cloud
+    #If a team is in onpremise, but not cloud, it should be added to cloud
     missing_teams = onpremise_teams.keys() - cloud_teams.keys()
     for team in missing_teams:
-        print(f'Creating mising team {team}: ')
+        print(f'Creating missing team {team}: ')
         sentry_cloud.create_team(onpremise_teams[team]['name'], onpremise_teams[team]['slug'])
         cloud_projects[team] = set()
 
-    # If a team exists in both, grant any missing project access in cloud
+    # If a team exists in both, grant access to any missing project in cloud
     common_teams = onpremise_projects.keys() & cloud_projects.keys()
+    cloud_projects_list = sentry_cloud.get_projects()
+
     for team in common_teams:
-        missing_projects = onpremise_projects[team] - cloud_projects[team]
-        for project in missing_projects:
-            print(f'Granting team {team} missing access to project {project}: ')
-            sentry_cloud.give_team_access_to_project(team, project)
+        onpremise_team_projects = onpremise_projects[team]
+        for op in onpremise_team_projects:
+            for cp in cloud_projects_list:
+                if op in cp:
+                    # adds mapping to the team.
+                    sentry_cloud.give_team_access_to_project(team, cp)
+                    #print("adding mapping of project "+ cp + " to team: " + team)

@@ -114,7 +114,7 @@ if __name__ == '__main__':
                     found=1
                     break
 
-        #Make a new user if not found in new org, email must match what is on Okta
+        #Make a new user if not found in new org
         if (found == 0):
 
             #Create new user

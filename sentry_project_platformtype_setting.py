@@ -42,13 +42,6 @@ class Sentry():
         results = self._get_api(f'/api/0/organizations/{self.org}/projects/')
         return [project.get('slug', '') for project in results]
 
-    def get_keys(self, project_slug):
-        """return the public and secret DSN links for the given project slug"""
-
-        results = self._get_api(f'/api/0/projects/{self.org}/{project_slug}/keys/')
-
-        return (results[0]['dsn']['public'], results[0]['dsn']['secret'])
-
     def get_teams(self):
         """Return slug names for given teams"""
 
