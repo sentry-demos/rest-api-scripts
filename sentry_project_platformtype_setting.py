@@ -50,7 +50,7 @@ class Sentry():
         return (results[0]['dsn']['public'], results[0]['dsn']['secret'])
 
     def get_teams(self):
-        """Return a slug names for given teams"""
+        """Return slug names for given teams"""
 
         results = self._get_api(f'/api/0/organizations/{self.org}/teams/')
 
