@@ -99,18 +99,19 @@ if __name__ == '__main__':
 
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('https://sentry.io',
-                              'adamstestorgz',
+    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
+                              '<ON_PREMISE_ORG_SLUG>',
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                          'testorg-az',
+                          '<ORG_SLUG>',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
     onpremise_teams = sentry_onpremise.get_teams()
 
-    #grab team id and team slug name from on-prem and add it to a dictionary
+    # Map team ids from on-prem to cloud so we can correctly create alerts for the 
+    # right team in cloud
     onprem_id_slugname = {team['slug']: team['id'] for team in onpremise_teams}
 
     #grab team id and team slug name from cloud and add it to another dictionary
@@ -139,6 +140,9 @@ if __name__ == '__main__':
         # project and send the alert in there
         for alert in alerts:
             #update the team id on the alert
+            
+            # the below is to stip the teamid value that will be replaced with the 
+            # teamid of the ids on SaaS Sentry
             teamid = alert["owner"][5:]
             teamid = dictionary_with_updatedvalues[teamid]
             alert["owner"] = "team:" + str(teamid)
