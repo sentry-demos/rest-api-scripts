@@ -2,7 +2,7 @@
 
 import os
 import sys
-
+import json
 import requests
 
 
@@ -15,17 +15,37 @@ class Sentry():
     def _get_api(self, endpoint):
         """HTTP GET the Sentry API"""
 
-        headers = {'Authorization': f'Bearer {self.token}'}
+        headers = {'Authorization': f'Bearer {self.token}',
+                    'Content-Type': 'application/json',}
         url = f'{self.base_url}{endpoint}'
         response = requests.get(url, headers=headers)
         return response.json()
 
+    def _get_api_pagination(self, endpoint):
+        """HTTP GET the Sentry API, following pagination links"""
+
+        headers = {'Authorization': f'Bearer {self.token}'}
+
+        results = []
+        url = f'{self.base_url}{endpoint}'
+        next = True
+        while next:
+            response = requests.get(url, headers=headers)
+            results.extend(response.json())
+
+            url = response.links.get('next', {}).get('url')
+            next = response.links.get('next', {}).get('results') == 'true'
+            if url == None:
+                next = False
+
+        return results
+
     def _post_api(self, endpoint, data=None):
         """HTTP POST the Sentry API"""
 
-        headers = {'Authorization': f'Bearer {self.token}'}
+        headers = {'Authorization': f'Bearer {self.token}',
+                    'Content-Type': 'application/json',}
         url = f'{self.base_url}{endpoint}'
-
         return requests.post(url, headers=headers, data=data)
 
     def _delete_api(self, endpoint):
@@ -42,28 +62,35 @@ class Sentry():
         results = self._get_api(f'/api/0/organizations/{self.org}/projects/')
         return [project.get('slug', '') for project in results]
     
-    def create_project_alert(self, project, data=None):
-        """Create an alert for a Sentry project"""
+    def create_project_issue_alert(self, project, data=None):
+        """Create a issue alert for a Sentry project"""
 
-        self._post_api(f'/api/0/projects/{self.org}/{project}/rules/', data=data)
+        return self._post_api(f'/api/0/projects/{self.org}/{project}/rules/', data=data)
+
+    def create_project_metric_alert(self, project, data=None):
+        """Create a metric alert for a Sentry project"""
+
+        return self._post_api(f'/api/0/projects/{self.org}/{project}/alert-rules/', data=data)
 
     def get_project_alerts(self, project):
         """Return a list of alerts for Sentry project"""
 
-        return self._get_api(f'/api/0/organizations/{self.org}/{project}/rules')
+        return self._get_api(f'/api/0/projects/{self.org}/{project}/combined-rules/')
 
-    def delete_project_alert(self, project, ruleId):
+    def delete_project_issue_alert(self, project, ruleId):
         """Delete an alert for a Sentry project"""
 
-        return self._delete_api(f'/api/0/projects/{self.org}/{project}/rules/{ruleId}')
+        return self._delete_api(f'/api/0/projects/{self.org}/{project}/rules/{ruleId}/')
 
+    def delete_project_metric_alert(self, project, ruleId):
+        """Delete an alert for a Sentry project"""
 
-    def get_keys(self, project_slug):
-        """return the public and secret DSN links for the given project slug"""
+        return self._delete_api(f'/api/0/projects/{self.org}/{project}/alert-rules/{ruleId}/')
 
-        results = self._get_api(f'/api/0/projects/{self.org}/{project_slug}/keys/')
+    def get_teams(self):
+        """Return a dictionary mapping team slugs to a set of project slugs"""
 
-        return (results[0]['dsn']['public'], results[0]['dsn']['secret'])
+        return self._get_api_pagination(f'/api/0/organizations/{self.org}/teams/')
 
 
 if __name__ == '__main__':
@@ -73,30 +100,85 @@ if __name__ == '__main__':
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
     sentry_onpremise = Sentry('https://sentry.io',
-                              '<ON_PREMISE_ORG_SLUG>',
+                              'adamstestorgz',
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                          '<ORG_SLUG>',
+                          'testorg-az',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
+    onpremise_teams = sentry_onpremise.get_teams()
 
+    #grab team id and team slug name from on-prem and add it to a dictionary
+    onprem_id_slugname = {team['slug']: team['id'] for team in onpremise_teams}
+
+    #grab team id and team slug name from cloud and add it to another dictionary
+    cloud_teams = sentry_cloud.get_teams()
+    cloud_id_slugname = {team['slug']: team['id'] for team in cloud_teams}
+
+    #dictionary to hold updated team ids, it will essentially be a mapping of
+    # onprem team ids to their equivalent cloud ids
+    dictionary_with_updatedvalues = {}
+
+    #create dictionary mapping described above bere
+    for key in onprem_id_slugname:
+        dictionary_with_updatedvalues.update({onprem_id_slugname[key]: cloud_id_slugname[key]})
+
+
+    #begin iterating through on-prem projects to gather alerts to send to SaaS Sentry
     for project in onpremise_projects:
 
-        # for each project grab alerts
+        # for each project grab alerts from on-premise and cloud Sentry
         alerts = sentry_onpremise.get_project_alerts(project)
 
-
+        cloudalerts = sentry_cloud.get_project_alerts(project)
 
         # iterate through alerts from on-prem account per project
         # and make sure to remove the alert that exists in the SaaS
         # project and send the alert in there
-
         for alert in alerts:
-            #delete the alert
-            sentry_cloud.delete_project_alert(project, alert["id"])
-            #create the alert
-            sentry_cloud.create_project_alert(project, alert)
+            #update the team id on the alert
+            teamid = alert["owner"][5:]
+            teamid = dictionary_with_updatedvalues[teamid]
+            alert["owner"] = "team:" + str(teamid)
+
+            #iterate through all SaaS Sentry alerts to see if the on-prem Sentry
+            #alert already exists, if it does, delete it
+            for cloudalert in cloudalerts:
+                if (cloudalert['name'] == alert['name']):
+                    if "triggers" in cloudalert:
+                        sentry_cloud.delete_project_metric_alert(project, cloudalert["id"])
+                    else:
+                        sentry_cloud.delete_project_issue_alert(project, cloudalert["id"])
+
+
+            #format the alert, if this is not done, you will get a 500 error back from
+            #Sentry
+            temp_alert = alert
+            temp_alert.pop('id', None)
+            temp_alert.pop('dateCreated', None)
+            temp_alert.pop('createdBy', None)
+            temp_alert.pop('projects', None)
+            temp_alert.pop('type', None)
+            temp_alert.pop('dateModified', None)
+            if "triggers" in temp_alert:
+                for value in temp_alert["triggers"]:
+                    del value["dateCreated"]
+                    del value["id"]
+                    del value["alertRuleId"]
+                    for action in value["actions"]:
+                        del value["actions"][0]["id"]
+                        del value["actions"][0]["alertRuleTriggerId"]
+                        del value["actions"][0]["dateCreated"]
+            temp_alert = json.dumps(alert).replace('None', 'null')
+
+            #check if the alert is a metric alert or issue alert and
+            # create the proper alert
+            if "triggers" in temp_alert:
+                sentry_cloud.create_project_metric_alert(project, temp_alert)
+            else:
+                sentry_cloud.create_project_issue_alert(project, temp_alert)
+
 
 

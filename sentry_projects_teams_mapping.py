@@ -51,7 +51,7 @@ class Sentry():
         return (results[0]['dsn']['public'], results[0]['dsn']['secret'])
 
     def get_teams(self):
-        """Return a dictionary mapping team slugs to a set of project slugs"""
+        """Return team slug names"""
 
         results = self._get_api_pagination(f'/api/0/organizations/{self.org}/teams/')
 
