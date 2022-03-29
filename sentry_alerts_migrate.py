@@ -117,12 +117,12 @@ if __name__ == '__main__':
 
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
-                              '<ON_PREMISE_ORG_SLUG>',
+    sentry_onpremise = Sentry('https://sentry.io',
+                              'adamstestorgz',
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                          '<ORG_SLUG>',
+                          'testorg-az',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
@@ -180,8 +180,14 @@ if __name__ == '__main__':
                         cloudalert["environment"] = alert["environment"]
                         #merge Sentry local actions with Sentry Cloud actions
                         if (alert["actions"]!=[]):
-                            for action in alert["actions"]:
-                                cloudalert["actions"].append(action)
+                            for index in range(len(alert["actions"])):
+                                #check for Slack integration, only update Workspace id
+                                if alert["actions"][index]["id"] == "sentry.integrations.slack.notify_action.SlackNotifyServiceAction":
+                                    for cloudindex in range(len(cloudalert["actions"])):
+                                        if cloudalert["actions"][cloudindex]["id"] == "sentry.integrations.slack.notify_action.SlackNotifyServiceAction":
+                                            #replace workspace number and channel_id here
+                                            cloudalert["actions"][cloudindex]["workspace"] = ""
+                                            cloudalert["actions"][cloudindex]["channel_id"] = ""
                         cloud_alert_to_modify = cloudalert
                         alertID = cloud_alert_to_modify["id"]
 
