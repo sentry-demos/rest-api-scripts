@@ -177,7 +177,10 @@ if __name__ == '__main__':
                         modify = 1
                         #make sure alerts JSON has environment tag set and Slack workspace set
                         cloudalert["environment"] = alert["environment"]
-                        cloudalert["actions"] = alert["actions"]
+                        #merge Sentry local actions with Sentry Cloud actions
+                        if (alert["actions"]!=[]):
+                            for action in alert["actions"]:
+                                cloudalert["actions"].append(action)
                         cloud_alert_to_modify = cloudalert
                         alertID = cloud_alert_to_modify["id"]
 
@@ -204,11 +207,11 @@ if __name__ == '__main__':
                             del value["actions"][0]["id"]
                             del value["actions"][0]["alertRuleTriggerId"]
                             del value["actions"][0]["dateCreated"]
-                temp_alert = json.dumps(alert).replace('None', 'null')
+                temp_alert = json.dumps(temp_alert).replace('None', 'null')
             else:
                 temp_alert = cloud_alert_to_modify
                 temp_alert.pop('type', None)
-                temp_alert = json.dumps(alert).replace('None', 'null')
+                temp_alert = json.dumps(temp_alert).replace('None', 'null')
 
             #check if the alert is a metric alert or issue alert and
             # create/update the proper alert, updating metric alerts not supported yet
