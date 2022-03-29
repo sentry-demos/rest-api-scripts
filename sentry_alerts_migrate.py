@@ -158,7 +158,7 @@ if __name__ == '__main__':
         for alert in alerts:
             #update the team id on the alert
             
-            # the below is to stip the teamid value that will be replaced with the 
+            # the below is to strip the teamid value that will be replaced with the 
             # teamid of the ids on SaaS Sentry
             teamid = alert["owner"][5:]
             teamid = dictionary_with_updatedvalues[teamid]
