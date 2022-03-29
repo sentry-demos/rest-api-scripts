@@ -79,6 +79,7 @@ class Sentry():
         """Create a metric alert for a Sentry project"""
 
         return self._post_api(f'/api/0/projects/{self.org}/{project}/alert-rules/', data=data)
+        
 
     def update_project_issue_alert(self, project, alertID, data=None):
         """Update the issue alert for a Sentry project"""
@@ -203,10 +204,13 @@ if __name__ == '__main__':
                         del value["dateCreated"]
                         del value["id"]
                         del value["alertRuleId"]
-                        for action in value["actions"]:
-                            del value["actions"][0]["id"]
-                            del value["actions"][0]["alertRuleTriggerId"]
-                            del value["actions"][0]["dateCreated"]
+                        for index in range(len(value["actions"])):
+                            del value["actions"][index]["id"]
+                            del value["actions"][index]["alertRuleTriggerId"]
+                            del value["actions"][index]["dateCreated"]
+                            #update team ids for the actions
+                            if value["actions"][index]["targetType"] == "team":
+                                value["actions"][index]["targetIdentifier"]=dictionary_with_updatedvalues[value["actions"][index]["targetIdentifier"]]
                 temp_alert = json.dumps(temp_alert).replace('None', 'null')
             else:
                 temp_alert = cloud_alert_to_modify
