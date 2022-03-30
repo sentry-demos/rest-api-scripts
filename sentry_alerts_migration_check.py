@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
 
-    #grab team id and team slug name from cloud and add it to another dictionary
+    #grab teams on Sentry SaaS
     cloud_teams = sentry_cloud.get_teams()
 
     #count of metric alerts in on-prem
@@ -93,20 +93,19 @@ if __name__ == '__main__':
         cloudalerts = sentry_cloud.get_project_alerts(project)
 
         # iterate through alerts from on-prem account per project
-        # and make sure to remove the alert that exists in the SaaS
-        # project and send the alert in there
+        # and make sure to count it
         for alert in alerts:
             if ("triggers" in alert):
                 countofmetricalerts += 1
 
             #iterate through all SaaS Sentry alerts to see if the on-prem Sentry
-            #alert already exists, if it does, modify it but don't create new alert
+            #alert already exists, if it does, count it
             for cloudalert in cloudalerts:
                 if (cloudalert['name'] == alert['name'] and "triggers" in cloudalert):
                     countofmetricalertscloud += 1
                     
 
-        
+    #compare on-prem alerts with cloud alerts
     if (countofmetricalerts == countofmetricalertscloud):
         print("Successful migration")
     else:

@@ -186,7 +186,7 @@ if __name__ == '__main__':
                                     for cloudindex in range(len(cloudalert["actions"])):
                                         if cloudalert["actions"][cloudindex]["id"] == "sentry.integrations.slack.notify_action.SlackNotifyServiceAction":
                                             #replace workspace number
-                                            cloudalert["actions"][cloudindex]["workspace"] = "10"
+                                            cloudalert["actions"][cloudindex]["workspace"] = alert["actions"][index]["workspace"]
                         cloud_alert_to_modify = cloudalert
                         alertID = cloud_alert_to_modify["id"]
                     
