@@ -117,12 +117,12 @@ if __name__ == '__main__':
 
 
     # copy over onpremise url (e.g. http://sentry.yourcompany.com)
-    sentry_onpremise = Sentry('<ON_PREMISE_URL>',
-                              '<ON_PREMISE_ORG_SLUG>',
+    sentry_onpremise = Sentry('https://sentry.io',
+                              'adamstestorgz',
                               onpremise_token)
 
     sentry_cloud = Sentry('https://sentry.io',
-                          '<ORG_SLUG>',
+                          'testorg-az',
                           cloud_token)
 
     onpremise_projects = sentry_onpremise.get_project_slugs()
@@ -158,12 +158,6 @@ if __name__ == '__main__':
         # project and send the alert in there
         for alert in alerts:
             #update the team id on the alert
-            
-            # the below is to strip the teamid value that will be replaced with the 
-            # teamid of the ids on SaaS Sentry
-            teamid = alert["owner"][5:]
-            teamid = dictionary_with_updatedvalues[teamid]
-            alert["owner"] = "team:" + str(teamid)
 
             #to be used for modifying the alert 
             modify = 0
@@ -185,10 +179,11 @@ if __name__ == '__main__':
                                 if alert["actions"][index]["id"] == "sentry.integrations.slack.notify_action.SlackNotifyServiceAction":
                                     for cloudindex in range(len(cloudalert["actions"])):
                                         if cloudalert["actions"][cloudindex]["id"] == "sentry.integrations.slack.notify_action.SlackNotifyServiceAction":
-                                            #replace workspace number and channel_id here
-                                            cloudalert["actions"][cloudindex]["workspace"] = ""
+                                            #replace workspace number
+                                            cloudalert["actions"][cloudindex]["workspace"] = "10"
                         cloud_alert_to_modify = cloudalert
                         alertID = cloud_alert_to_modify["id"]
+                    
 
                         #Can delete the alert with the two options below
                         #1.  sentry_cloud.delete_project_metric_alert(project, cloudalert["id"])
