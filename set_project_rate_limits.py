@@ -60,12 +60,12 @@ class Sentry():
 
         return self._put_api(f'/api/0/projects/{self.org}/{project}/keys/{keyId}/', data=data)
 
-    def get_key(self, project_slug):
-        """return the public DSN key for the given project slug"""
+    def get_keys(self, project_slug):
+        """return all the keys for the given project slug"""
 
         results = self._get_api(f'/api/0/projects/{self.org}/{project_slug}/keys/')
 
-        return results[0]['dsn']['public']
+        return results
 
     def get_teams(self):
         """Return a dictionary mapping team slugs to a set of project slugs"""
@@ -82,26 +82,30 @@ if __name__ == '__main__':
                               'adamtestorg',
                               cloud_token)
 
+    #grab project slugs
     cloud_projects = sentry_cloud.get_project_slugs()
 
 
-    #begin iterating through on-prem projects to gather alerts to send to SaaS Sentry
+    #begin iterating through projects to set DSN limits for SaaS Sentry
     for project in cloud_projects:
 
 
-         # get key
-        key = sentry_cloud.get_key(project)
+         # iterate through keys
+        keys = sentry_cloud.get_keys(project)
+        for key in keys:
+            #strip out the key
+            key = key['dsn']['public']
+            key = key[8:40]
 
-        #strip out the key
-        key = key[8:40]
-        
-        data = {
-                "rateLimit": {"count": 100, "window": 60}
-                }
 
-        #for each project, set the DSN rate limit on
-        #a per project level
-        sentry_cloud.set_project_rate_limits(project, key, json.dumps(data))
+            #Set the DSN rate limit
+            data = {
+                    "rateLimit": {"count": 100, "window": 60}
+                    }
+
+            #for each project, set the DSN rate limit on
+            #a per project level
+            sentry_cloud.set_project_rate_limits(project, key, json.dumps(data))
 
 
 
