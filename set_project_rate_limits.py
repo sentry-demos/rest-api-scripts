@@ -14,9 +14,7 @@ class Sentry():
 
     def _get_api(self, endpoint):
         """HTTP GET the Sentry API"""
-
-        headers = {'Authorization': f'Bearer {self.token}',
-                    'Content-Type': 'application/json',}
+        headers = {'Authorization': f'Bearer {self.token}'}
         url = f'{self.base_url}{endpoint}'
         response = requests.get(url, headers=headers)
         return response.json()
@@ -51,7 +49,7 @@ class Sentry():
     def get_project_slugs(self):
         """Return a list of project slugs in this Sentry org"""
 
-        results = self._get_api(f'/api/0/organizations/{self.org}/projects/')
+        results = self._get_api_pagination(f'/api/0/projects/')
         return [project.get('slug', '') for project in results]
     
 
@@ -79,7 +77,7 @@ if __name__ == '__main__':
 
     # copy over cloud url (e.g. http://sentry.yourcompany.com)
     sentry_cloud = Sentry('https://sentry.io',
-                              'adamtestorg',
+                              '<CLOUD_ORG_SLUG>',
                               cloud_token)
 
     #grab project slugs
@@ -100,7 +98,7 @@ if __name__ == '__main__':
 
             #Set the DSN rate limit
             data = {
-                    "rateLimit": {"count": 100, "window": 60}
+                    "rateLimit": {"count": 1000, "window": 60}
                     }
 
             #for each project, set the DSN rate limit on
