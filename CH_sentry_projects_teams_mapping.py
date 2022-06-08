@@ -110,4 +110,4 @@ if __name__ == '__main__':
                 if op in cp:
                     # adds mapping to the team.
                     sentry_cloud.give_team_access_to_project(team, cp)
-                    print("adding mapping of project "+ cp + " to team: " + team)
+                    #print("adding mapping of project "+ cp + " to team: " + team)
