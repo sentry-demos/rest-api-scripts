@@ -27,7 +27,7 @@ class Sentry():
 
         return results
         
-    def get_projects(self):
+    def get_issues(self):
         results = self._get_api_pagination(f'/api/0/projects/healthsherpa/healthsherpa/issues/')
         return results
 
@@ -41,7 +41,7 @@ if __name__ == '__main__':
                           '<ORG_SLUG>',
                           cloud_token)
 
-    sentry_response = sentry_cloud.get_projects() 
+    sentry_response = sentry_cloud.get_issues() 
     print(sentry_response)
     
 
