@@ -2,16 +2,17 @@ require 'json'
 require 'pry'
 
 class Comparer
-	attr_reader :prod_data, :merged_data, :staging_data
+	attr_reader :prod_data, :merged_data, :staging_data, :legacy_data
 	def initialize
 =begin
 		@prod_data 	= JSON.parse(File.read('first_import/sentry_export_production.json'))
 		@staging_data = JSON.parse(File.read('first_import/sentry_export_staging.json'))
 		@merged_data 		= JSON.parse(File.read('02-16-2022.13.26.01_merged_export.json'))
 =end
-		@prod_data 	= JSON.parse(File.read('second_import/second_do_sentry_export_production.json'))
-		@staging_data = JSON.parse(File.read('second_import/second_do_sentry_export_staging.json'))
-		@merged_data 		= JSON.parse(File.read('03-07-2022.11.54.35_merged_export.json'))
+		@prod_data 	= JSON.parse(File.read('fs/sentry-export-prod.json'))
+		@staging_data = JSON.parse(File.read('fs/sentry-export-uat-adjusted.json'))
+		@legacy_data = JSON.parse(File.read('fs/sentry-export-fio-adjusted.json'))
+		@merged_data 		= JSON.parse(File.read('fs-08-18-2022.13.59.50_merged_export.json'))
 	end
 
 	def compare
@@ -23,7 +24,9 @@ class Comparer
 	def compare_teams
 		prod_teams = prod_data.select{|entry| entry['model'] == 'sentry.team'}
 		staging_teams = staging_data.select{|entry| entry['model'] == 'sentry.team'}
+		legacy_teams = legacy_data.select{|entry| entry['model'] == 'sentry.team'}
 		merged_teams = merged_data.select{|entry| entry['model'] == 'sentry.team'}
+		# binding.pry
 		found_teams = {}
 
 		prod_teams.each do |prod_team|
@@ -54,6 +57,20 @@ class Comparer
 			end
 		end
 
+		legacy_teams.each do |legacy_team|
+			legacy_slug = legacy_team['fields']['slug']
+			found_teams[legacy_slug] = false
+			merged_teams.each do |merged_team|
+				merged_slug = merged_team['fields']['slug']
+				if found_teams[legacy_slug]
+					next
+				elsif legacy_slug == merged_slug
+					found_teams[legacy_slug] = true
+					next
+				end
+			end
+		end
+
 		found_teams.each do |slug, _|
 			if !found_teams[slug]
 				raise "did not find slug #{slug}"
@@ -66,7 +83,10 @@ class Comparer
 	def compare_projects
 		prod_projects = prod_data.select{|entry| entry['model'] == 'sentry.project'}
 		staging_projects = staging_data.select{|entry| entry['model'] == 'sentry.project'}
+		legacy_projects = legacy_data.select{|entry| entry['model'] == 'sentry.project'}
 		merged_projects = merged_data.select{|entry| entry['model'] == 'sentry.project'}
+				binding.pry
+
 		found_projects = {}
 
  		prod_projects.each do |prod_project|
@@ -80,6 +100,26 @@ class Comparer
 					found_projects[prod_slug] = true
 					next
 				end
+			end
+		end
+
+		legacy_projects.each do |legacy_project|
+			legacy_slug = legacy_project['fields']['slug']
+			found_projects[legacy_slug] = false
+			merged_projects.each do |merged_project|
+				merged_slug = merged_project['fields']['slug']
+				if found_projects[legacy_slug]
+					next
+				elsif legacy_slug == merged_slug
+					found_projects[legacy_slug] = true
+					next
+				end
+			end
+		end
+
+		merged_projects.each do |project|
+			if !project['fields'].keys.include?("platform")
+				raise "project #{project['fields']['slug']} did not have a platform key. You can add 'platform': 'null'"
 			end
 		end
 
@@ -105,6 +145,7 @@ class Comparer
 	def compare_projectoptions_rules_keys
 		prod_projects = prod_data.select{|entry| entry['model'] == 'sentry.project'}
 		staging_projects = staging_data.select{|entry| entry['model'] == 'sentry.project'}
+		legacy_projects = legacy_data.select{|entry| entry['model'] == 'sentry.project'}
 		merged_projects = merged_data.select{|entry| entry['model'] == 'sentry.project'}
 
 		prod_mapping = []
@@ -133,6 +174,20 @@ class Comparer
 				keys: keys
 			}
 			staging_mapping << associated_vals
+		end
+
+		legacy_mapping = []
+		legacy_projects.each do |legacy_proj|
+			associated_vals = {}
+			options = legacy_data.select{|entry| entry['model'] == 'sentry.projectoption' && entry['fields']['project'] == legacy_proj['pk']}
+			rules = legacy_data.select{|entry| entry['model'] == 'sentry.rule' && entry['fields']['project'] == legacy_proj['pk']}
+			keys = legacy_data.select{|entry| entry['model'] == 'sentry.projectkey' && entry['fields']['project'] == legacy_proj['pk']}
+			associated_vals[legacy_proj['fields']['slug']] = {
+				options: options,
+				rules: rules,
+				keys: keys
+			}
+			legacy_mapping << associated_vals
 		end
 
 		merged_mapping = []
@@ -180,6 +235,21 @@ class Comparer
 				matched_opt = equivalent_merged_project_data[:options].find{|merged_opt| staging_opt['fields']['value'] == merged_opt['fields']['value']}
 				if !matched_opt
 					raise "Could not match project options for project #{slug_staging}"
+				end
+			end
+		end
+
+		legacy_mapping.each do |data_legacy|
+			slug_legacy = data_legacy.first.first
+			if prod_mapping.find{|data_prod| data_prod[slug_legacy]}
+				next
+			end
+			# puts "Unique legacy project #{slug_legacy}"
+			equivalent_merged_project_data = merged_mapping.find{|merged_proj| merged_proj.first.first == slug_legacy}[slug_legacy]
+			data_legacy[slug_legacy][:options].each do |legacy_opt|
+				matched_opt = equivalent_merged_project_data[:options].find{|merged_opt| legacy_opt['fields']['value'] == merged_opt['fields']['value']}
+				if !matched_opt
+					raise "Could not match project options for project #{slug_legacy}"
 				end
 			end
 		end
