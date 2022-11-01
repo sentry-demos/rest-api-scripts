@@ -130,3 +130,6 @@ dmypy.json
 
 #Script Submit
 .DS_Store
+
+# config file for app packs
+**/app_packs/**/*.properties
