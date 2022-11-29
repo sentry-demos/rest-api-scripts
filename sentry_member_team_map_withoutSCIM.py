@@ -101,7 +101,10 @@ if __name__ == '__main__':
     onpremise_slug = os.environ['ON_PREMISE_ORG_SLUG']
     cloud_token = os.environ['SENTRY_CLOUD_AUTH_TOKEN']
     cloud_slug = os.environ['ORG_SLUG']
+
+    # commenting out since members cannot currently be created via API, apparently
     # dryrun_member_creation = True #change to false when ready to create members in SaaS for real
+    
     dryrun_associate_members_teams = True #change to false when ready to associate members/teams in SaaS for real
 
     if dryrun_associate_members_teams:
@@ -109,6 +112,7 @@ if __name__ == '__main__':
     else:
         logger.info("=========================\nRunning for real\n=========================")
 
+    # commenting out since members cannot currently be created via API, apparently
     # prompt_user_to_confirm_dry_run_mode(dryrun_member_creation, "Recreate on-premise members in SaaS")
 
     onpremise_url = onpremise_url.strip("/"); #removes trailing slash '/' of the URL if needed
@@ -193,7 +197,6 @@ if __name__ == '__main__':
     logger.info("\n================================================")
     logger.info("\n...Preparing to assign cloud members to teams...")
 
-    # if userInput.lower() == "y":
     for team in onpremise_teams:
         logger.info("\n")
         #update old team members with ids of new org member ids
