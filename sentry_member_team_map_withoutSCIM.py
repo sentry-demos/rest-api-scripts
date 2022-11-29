@@ -1,5 +1,19 @@
 #!/usr/bin/env python
 
+"""
+Note: using Okta? Read this:
+
+- Sentry customers using Okta can uses this non-SCIM version of the script (provided the teams in their self-hosted
+  instance are not provisioned/defined using SCIM).
+
+- Okta should be set up in Sentry before running this script, because the script assumes
+    members will be accessible in cloud Sentry. Setting up Okta allows them to be accessible.
+
+- Note: Okta users will have to log in to Sentry for the first time to be correctly associated to teams. For instance,
+  after running the script, we can observe the member/team mappings being set up when we check the audit log.
+  However, it's only once the member logs in for the first time that the member actually shows up in the list of a team's members.
+"""
+
 import os
 import sys
 import requests
@@ -130,7 +144,14 @@ if __name__ == '__main__':
             }
             data["userName"] = member.get('email')
             data['email'] = member.get('email')
+
+            ### NOTE, Nov 2022: I don't think it's possible to create members via API anymore, the API must have changed.
+            #   This portion of the script should be rewritten to reflect it.
+            #   It's best to invite these members manually. If there are a lot of members, Sentry customer should coordinate
+            #   with their Sentry contacts to figure out the best approach.
             newuser = sentry_cloud.create_team_member(data)
+            printf(f'Member {member.get('email')} not found in cloud Sentry. The member cannot be created automatically via API; please invite them.')
+
             logger.info("Created new user (userName, role) in cloud: %s, %s" % (data["userName"], data['role']))
             #get id of new user
             newuser_id = newuser.get("id")
