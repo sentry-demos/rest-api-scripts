@@ -55,7 +55,6 @@ class Sentry():
 
     def get_teams(self):
         """Return a dictionary mapping team slugs to a set of project slugs"""
-
         results = self._get_api_pagination(f'/api/0/organizations/{self.org}/teams/')
         return {team['slug']: team for team in results if 'slug' in team}
 
@@ -71,18 +70,29 @@ class Sentry():
         members = self._get_api_pagination(f'/api/0/organizations/{self.org}/members/')
         return members
 
-    def create_team_member(self, data=None):
-        """Create team member"""
-
-        teammember = self._post_api(f'/api/0/organizations/{self.org}/members/', data)
-        return teammember.json()
-
-    def update_team_reg(self, memberid, teamname):
+    def update_team_reg(self, memberid, teamname, member_email):
         """Update team attributes"""
 
         result = self._post_api(f'/api/0/organizations/{self.org}/members/{memberid}/teams/{teamname}/')
-        return result
+        if result.status_code in [201,204]:
+            logger.info("Team '%s' has assigned cloud member '%s'" % (team,member_email))
+            return result
+        else:
+            logger.warning(f'\n[WARN] Could not assign member {member_email} to team {teamname}. Status code {result.status_code}\n')
 
+def prompt_user_to_confirm_dry_run_mode(is_dryrun_mode, action_to_take):
+    print("\n")
+    if is_dryrun_mode:
+        print(f'Running in DRYRUN MODE. About to {action_to_take}.')
+    else:
+        print(f'Running for real (not dry run mode). About to {action_to_take}. This will cause database changes to be made to SaaS.')
+
+    selection = input(f"Continue? y/n:\n")
+    if selection != "y":
+        print("'y' not selected. Exiting program.")
+        sys.exit()
+    else:
+        print("\n")
 
 
 if __name__ == '__main__':
@@ -91,12 +101,20 @@ if __name__ == '__main__':
         format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s', 
         datefmt='%Y-%m-%d:%H:%M:%S', level=logging.DEBUG, filemode='a')
     logger = logging.getLogger(__name__)
+    handler = logging.StreamHandler(sys.stdout)
+    logger.addHandler(handler)
     logger.info(">>> Script started")
     onpremise_token = os.environ['SENTRY_ONPREMISE_AUTH_TOKEN']
     onpremise_url = os.environ['ON_PREMISE_URL']
     onpremise_slug = os.environ['ON_PREMISE_ORG_SLUG']
     cloud_token = os.environ['SENTRY_CLOUD_AUTH_TOKEN']
     cloud_slug = os.environ['ORG_SLUG']
+    dryrun_associate_members_teams = True #change to false when ready to associate members/teams in SaaS for real
+
+    if dryrun_associate_members_teams:
+        logger.info("=========================\nRunning in DRY RUN MODE\n=========================")
+    else:
+        logger.info("=========================\nRunning for real\n=========================")
 
     onpremise_url = onpremise_url.strip("/"); #removes trailing slash '/' of the URL if needed
 
@@ -121,7 +139,8 @@ if __name__ == '__main__':
     logger.info("Get cloud members completed.")
 
     #get id of old account and store it along with email in a common dictionary, i.e. updated_ids_dict
-    logger.info("Checking for duplicate users...")
+    logger.info("\n================================================")
+    logger.info("...Checking for duplicate users in cloud/on-prem. These users may need to be added via Sentry UI...\n")
     for member in onpremise_members:
         found = 0
         # Check if any onpremise members already exist as cloud members
@@ -131,33 +150,17 @@ if __name__ == '__main__':
                 #update id in common dictionary to use pre-existing cloud member's id
                 updated_ids_dict[member.get('email')] = cloudmember.get('id')
                 found = 1
-                logger.info("Duplicate member found! They already exist in cloud: %s" % (member.get('email')))
+                # logger.info("Member already exists in cloud: %s" % (member.get('email')))
                 break
 
-        # Make a new user if not found in cloud, email must match what is on Okta
+        # If user is not found in cloud, customer will need to invite them separately;
+        # new users cannot be added via script
         if (found == 0):
-            role = member.get('role')
-            #Create new user
-            data = {
-                "email": "",
-                "role": role
-            }
-            data["userName"] = member.get('email')
-            data['email'] = member.get('email')
+            msg = f'[INFO] - onprem user "{member.get('email')}" ("{member.get('role')}" role) does not exist in cloud'
+            printf(msg)
+            logger.info(msg)
 
-            ### NOTE, Nov 2022: I don't think it's possible to create members via API anymore, the API must have changed.
-            #   This portion of the script should be rewritten to reflect it.
-            #   It's best to invite these members manually. If there are a lot of members, Sentry customer should coordinate
-            #   with their Sentry contacts to figure out the best approach.
-            newuser = sentry_cloud.create_team_member(data)
-            printf(f'Member {member.get('email')} not found in cloud Sentry. The member cannot be created automatically via API; please invite them.')
-
-            logger.info("Created new user (userName, role) in cloud: %s, %s" % (data["userName"], data['role']))
-            #get id of new user
-            newuser_id = newuser.get("id")
-            
-            #update id in common dictionary
-            updated_ids_dict[member['email']] = newuser_id
+    prompt_user_to_confirm_dry_run_mode(dryrun_associate_members_teams, "assign users to teams.\nNote: Users would be assigned to the same team names as they had from onprem. The teams must already exist on the cloud Sentry.")
 
     # By now, all onpremise_members should have updated ids for the new org,
     # this should be stored in the new dictionary
@@ -166,23 +169,32 @@ if __name__ == '__main__':
     # Teams exist in both spots, team names must exist in both spots but
     # ids will be different, as a result, team name must be used because
     # that's whats in common
-    userInput = input("\nWould you like to assign cloud users to teams?\nNote: Users would be assigned to the same team names as they had from onprem. The teams must already exist on the cloud Sentry.\n(y/n): ")
     
-    if userInput.lower() == "y":
-        for team in onpremise_teams:
-            #update old team members with ids of new org member ids
-            for member in sentry_onpremise.get_teams_members_reg(team):
-                #onpremise team member for selected team has updated id
-                member['id'] = updated_ids_dict.get(member.get("email"))
-                
-                #update cloud team with member from on_prem team
-                if team in cloud_teams:
-                    sentry_cloud.update_team_reg(member['id'], team)
-                    logger.info("Cloud user %s has been assigned to team %s" % (member.get("email"), team))
-                else:
-                    logger.info("Team %s does not exist in cloud! Could not add user %s" % (team, member.get("email")))
-    else:
-        logger.info("Skipped assigning cloud users to corresponding onprem teams")
+    logger.info("\n================================================")
+    logger.info("\n...Preparing to assign cloud members to teams...")
 
-    logger.info("<<< Script completed")
+    for team in onpremise_teams:
+        logger.info("\n")
+        #update old team members with ids of new org member ids
+        for onprem_member in sentry_onpremise.get_teams_members_reg(team):
+            #onpremise team member for selected team has updated id
+            onprem_member['id'] = updated_ids_dict.get(onprem_member.get("email"))
+            #update cloud team with member from on_prem team
+            if team in cloud_teams:
+                onprem_member_exists_in_cloud = True in (cloud_member['email'] == onprem_member['email'] for cloud_member in cloud_members)
+                if dryrun_associate_members_teams:
+                    if onprem_member_exists_in_cloud:
+                        logger.info("DRY RUN: Team '%s' would add cloud member '%s'" % (team,onprem_member.get("email")))
+                    else:
+                        logger.info(f'[WARN] DRY RUN: Onprem user "{onprem_member["email"]}" on team "{team}" does not exist in cloud! Cannot add to cloud team {team}')
+                else:
+                    if onprem_member_exists_in_cloud:
+                        logger.info("Adding to Team %s - cloud member %s" % (team,onprem_member.get("email")))
+                        sentry_cloud.update_team_reg(onprem_member['id'], team, onprem_member['email'])
+                    else:
+                        logger.warning(f'[WARN] ==========> onprem user "{onprem_member["email"]}" does not exist in cloud; could not add to team "{team}"!')
+            else:
+                logger.warning("[WARN] Team %s does not exist in cloud! Could not add member %s\n" % (team, onprem_member.get("email")))
+
+    logger.info("\n<<< Script completed")
     print("\nScript completed. Log available in ./%s" % (os.path.basename(__file__)+'.log'))
