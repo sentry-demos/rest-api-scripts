@@ -366,6 +366,7 @@ def alert_via_api(proj_name, alert_name, json_data, teams, alert_type):
 
     try:
         print(f'- Attempting to create alert: "{alert_name}"')
+
         response = requests.post(
                     url,
                     headers = headers, 
@@ -404,7 +405,8 @@ def build_alert_json(proj_name, alert_name, payload):
     # Alert names can only contain up to 64 characters
     name64 = name[:60] + " ..." if len(name) > 64 else name
 
-    payload["name"] = name64    
+    payload["name"] = name64
+    payload["projects"] = [proj_name]
     return jsons.dumps(payload)
 
 def generate_url(proj_name, alert_name, alert_type):
